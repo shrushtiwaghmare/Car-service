@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 
+const API_URL = "http://127.0.0.1:5001/api/bookings";
+
 // all the services we offer
 const services = [
   { icon: "🚿", name: "Car Wash", price: 499, about: "Outside and inside cleaning of your car." },
@@ -30,7 +32,7 @@ function App() {
 
   // get the bookings from flask
   function loadBookings() {
-    fetch("http://127.0.0.1:5000/api/bookings")
+    fetch(API_URL)
       .then((res) => res.json())
       .then((data) => setBookings(data))
       .catch(() => setBookings([]));
@@ -50,7 +52,7 @@ function App() {
       return;
     }
 
-    fetch("http://127.0.0.1:5000/api/bookings", {
+    fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -62,7 +64,11 @@ function App() {
         time: time,
       }),
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Booking failed.");
+        return data;
+      })
       .then(() => {
         setMessage("Booking done! We will call you soon.");
         setName("");
@@ -73,12 +79,18 @@ function App() {
         setTime("");
         loadBookings();
       })
-      .catch(() => setMessage("Something went wrong. Please try again."));
+      .catch((error) => {
+        setMessage(
+          error.message === "Failed to fetch"
+            ? "Could not reach the booking server. Make sure the backend is running."
+            : error.message || "Something went wrong. Please try again."
+        );
+      });
   }
 
   // delete one booking
   function deleteBooking(id) {
-    fetch("http://127.0.0.1:5000/api/bookings/" + id, { method: "DELETE" })
+    fetch(API_URL + "/" + id, { method: "DELETE" })
       .then(() => loadBookings())
       .catch(() => alert("Something went wrong. Please try again."));
   }
