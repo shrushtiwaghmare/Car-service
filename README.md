@@ -35,7 +35,7 @@ npm install
 npm run dev
 ```
 
-The website runs on http://localhost:5173
+The website runs on http://localhost:5180
 
 ## API routes
 

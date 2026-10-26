@@ -99,7 +99,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100">
+    <div className="min-h-screen flex flex-col *:w-full bg-neutral-100">
       {/* NAVBAR */}
       <nav className="bg-[#0A0A0A] px-6 py-4 md:flex md:items-center md:justify-between">
         <h1 className="text-xl font-bold text-white text-center md:text-left">
@@ -314,7 +314,7 @@ function App() {
       )}
 
       {/* FOOTER */}
-      <footer className="bg-[#0A0A0A] px-6 py-6 text-center text-sm text-gray-400">
+      <footer className="mt-auto bg-[#0A0A0A] px-6 py-6 text-center text-sm text-gray-400">
         3M Car Care - College Project
       </footer>
     </div>
