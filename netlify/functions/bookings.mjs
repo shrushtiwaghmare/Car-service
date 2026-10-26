@@ -14,7 +14,9 @@ export default async (req, context) => {
   }
 
   if (req.method === "POST" && !id) {
-    const b = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    // trim every field so "   " counts as empty
+    const b = Object.fromEntries(FIELDS.map((f) => [f, String(body?.[f] ?? "").trim()]));
     if (FIELDS.some((f) => !b[f])) {
       return Response.json({ message: "Please fill all fields." }, { status: 400 });
     }
