@@ -3,8 +3,8 @@
 A simple car service booking website made as a college project.
 
 - Frontend: React + Vite + Tailwind CSS
-- Backend: Python + Flask
-- Database: SQLite
+- Backend: Netlify Function (`netlify/functions/bookings.mjs`)
+- Database: Netlify Database (Postgres)
 
 ## Pages
 
@@ -13,29 +13,29 @@ A simple car service booking website made as a college project.
 - Book Service - booking form
 - Bookings - table of all bookings with a Delete button
 
-## How to run the backend
+## How to run locally
 
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python app.py
+npm install                 # backend dependency (@netlify/database)
+npm --prefix frontend install
+npx netlify-cli dev         # starts Vite + the API + a local Postgres database
 ```
 
-The backend runs on http://127.0.0.1:5000 and it creates `carcare.db` automatically.
-
-## How to run the frontend
-
-Open a new terminal:
+The first time, create the table in the local database:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npx netlify-cli database migrations apply
 ```
 
-The website runs on http://localhost:5180
+The website runs on http://localhost:8888 (Vite itself runs on 5180 behind it).
+
+## How to deploy on Netlify
+
+1. Push this repo to GitHub.
+2. In Netlify: **Add new project → Import from Git** and pick this repo.
+   Build settings are read from `netlify.toml`, so nothing needs to be filled in.
+3. Deploy. Netlify creates the database and runs the migrations in
+   `netlify/database/migrations/` automatically on every deploy.
 
 ## API routes
 
@@ -47,5 +47,7 @@ The website runs on http://localhost:5180
 
 ## Database table
 
-One table called `bookings` with columns:
+One table called `bookings` (see `netlify/database/migrations/0001_create_bookings.sql`) with columns:
 `id, name, phone, car_model, service, date, time`
+
+To change the table, add a new migration file (e.g. `0002_add_email.sql`) instead of editing the old one.

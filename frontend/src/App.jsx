@@ -28,9 +28,9 @@ function App() {
   // all bookings from the database
   const [bookings, setBookings] = useState([]);
 
-  // get the bookings from flask
+  // get the bookings from the api
   function loadBookings() {
-    fetch("http://127.0.0.1:5000/api/bookings")
+    fetch("/api/bookings")
       .then((res) => res.json())
       .then((data) => setBookings(data))
       .catch(() => setBookings([]));
@@ -50,7 +50,7 @@ function App() {
       return;
     }
 
-    fetch("http://127.0.0.1:5000/api/bookings", {
+    fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -78,7 +78,7 @@ function App() {
 
   // delete one booking
   function deleteBooking(id) {
-    fetch("http://127.0.0.1:5000/api/bookings/" + id, { method: "DELETE" })
+    fetch("/api/bookings/" + id, { method: "DELETE" })
       .then(() => loadBookings())
       .catch(() => alert("Something went wrong. Please try again."));
   }

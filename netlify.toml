@@ -1,0 +1,9 @@
+[build]
+  command = "npm --prefix frontend ci && npm --prefix frontend run build"
+  publish = "frontend/dist"
+
+# `netlify dev` runs Vite and serves the site + /api functions on http://localhost:8888
+[dev]
+  command = "npm --prefix frontend run dev"
+  targetPort = 5180
+  port = 8888
