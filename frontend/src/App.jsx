@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 const API = "/api";
 const emptyForm = { name: "", phone: "", car_model: "", service: "", date: "", time: "" };
+const bookingStatuses = ["Pending", "Confirmed", "In Progress", "Completed", "Cancelled"];
 
 async function api(path, options = {}) {
   const response = await fetch(`${API}${path}`, {
@@ -34,6 +35,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [adminStatusFilter, setAdminStatusFilter] = useState("All");
+  const [adminUpdating, setAdminUpdating] = useState(null);
 
   function clearMessages() {
     setNotice("");
@@ -193,6 +196,20 @@ function App() {
     }
   }
 
+  async function updateAdminStatus(id, status) {
+    setAdminUpdating(id);
+    clearMessages();
+    try {
+      await api(`/admin/bookings/${id}`, { method: "PUT", body: { status } });
+      await loadBookings();
+      setNotice(`Booking #${id} is now ${status.toLowerCase()}.`);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setAdminUpdating(null);
+    }
+  }
+
   const counts = bookings.reduce((all, booking) => {
     all[booking.status] = (all[booking.status] || 0) + 1;
     return all;
@@ -201,6 +218,7 @@ function App() {
   const history = bookings.filter((booking) => ["Completed", "Cancelled"].includes(booking.status) || booking.date < new Date().toISOString().slice(0, 10));
   const activeBookings = bookings.filter((booking) => ["Pending", "Confirmed"].includes(booking.status) && booking.date >= new Date().toISOString().slice(0, 10));
   const shownBookings = (page === "history" ? history : activeBookings).filter((booking) => filter === "All" || booking.status === filter);
+  const adminBookings = bookings.filter((booking) => adminStatusFilter === "All" || (booking.status || "Pending") === adminStatusFilter);
   const futureDate = new Date().toISOString().slice(0, 10);
 
   function navigate(nextPage) {
@@ -251,11 +269,36 @@ function App() {
   return <div className="flex min-h-screen flex-col bg-neutral-100">
     <header className="bg-neutral-950 text-white">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-4"><button onClick={() => navigate("dashboard")} className="text-lg font-extrabold">3M <span className="text-red-600">CAR CARE</span></button><div className="flex items-center gap-4"><span className="hidden text-sm text-neutral-300 sm:block">{user.name}</span><button onClick={signOut} className="border border-neutral-700 px-3 py-2 text-sm hover:border-red-600">Sign out</button></div></div>
-      <nav className="mx-auto flex max-w-7xl gap-6 overflow-x-auto px-5" aria-label="Main navigation">{[["dashboard", "Dashboard"], ["services", "Services"], ["bookings", "My Bookings"], ["history", "History"], ["profile", "My Profile"], ["contact", "Contact"]].map(([key, title]) => <button key={key} onClick={() => navigate(key)} className={navClass(key)}>{title}</button>)}</nav>
+      <nav className="mx-auto flex max-w-7xl gap-6 overflow-x-auto px-5" aria-label="Main navigation">{[["dashboard", "Dashboard"], ["services", "Services"], ["bookings", "My Bookings"], ["history", "History"], ...(user.role === "admin" ? [["admin", "Admin"]] : []), ["profile", "My Profile"], ["contact", "Contact"]].map(([key, title]) => <button key={key} onClick={() => navigate(key)} className={navClass(key)}>{title}</button>)}</nav>
     </header>
     <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-8">
       {notice && <div role="status" className="mb-5 flex items-center justify-between border-l-4 border-green-600 bg-green-50 px-4 py-3 text-sm text-green-900">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss message" className="ml-4 font-bold">×</button></div>}
       {error && <div role="alert" className="mb-5 flex items-center justify-between border-l-4 border-red-600 bg-red-50 px-4 py-3 text-sm text-red-900">{error}<button onClick={() => setError("")} aria-label="Dismiss error" className="ml-4 font-bold">×</button></div>}
+
+      {page === "admin" && user.role === "admin" && <>
+        <PageTitle title="Admin booking desk" subtitle="Review all customer bookings and update each service's progress." />
+        <section className="mt-6 grid grid-cols-2 gap-px border border-neutral-200 bg-neutral-200 sm:grid-cols-5">
+          {bookingStatuses.map((status) => <div key={status} className="bg-white p-4"><p className="text-sm text-neutral-500">{status}</p><p className="mt-1 text-2xl font-black text-neutral-900">{bookings.filter((booking) => (booking.status || "Pending") === status).length}</p></div>)}
+        </section>
+        <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
+          <div><h2 className="text-xl font-bold text-neutral-950">All customer bookings</h2><p className="mt-1 text-sm text-neutral-500">Showing {adminBookings.length} of {bookings.length}</p></div>
+          <label className="text-sm font-semibold text-neutral-700">Filter by status<select value={adminStatusFilter} onChange={(event) => setAdminStatusFilter(event.target.value)} className="ml-2 border border-neutral-300 bg-white px-3 py-2"><option>All</option>{bookingStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
+        </div>
+        <div className="mt-4 overflow-x-auto border border-neutral-200 bg-white">
+          {adminBookings.length === 0 ? <EmptyState text="There are no bookings in this status yet." /> : <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="bg-neutral-900 text-white"><tr>{["Booking", "Customer", "Phone", "Car", "Service", "Appointment", "Service status"].map((heading) => <th key={heading} className="px-4 py-3 font-semibold">{heading}</th>)}</tr></thead>
+            <tbody>{adminBookings.map((booking) => <tr key={booking.id} className="border-t border-neutral-200 align-top">
+              <td className="px-4 py-4 font-semibold">#{booking.id}</td>
+              <td className="px-4 py-4">{booking.name}</td>
+              <td className="px-4 py-4">{booking.phone}</td>
+              <td className="px-4 py-4">{booking.car_model}</td>
+              <td className="px-4 py-4">{booking.service}</td>
+              <td className="px-4 py-4">{booking.date}<span className="block text-xs text-neutral-500">{booking.time}</span></td>
+              <td className="px-4 py-4"><label className="sr-only" htmlFor={`admin-status-${booking.id}`}>Service status for booking {booking.id}</label><select id={`admin-status-${booking.id}`} value={booking.status || "Pending"} disabled={adminUpdating === booking.id} onChange={(event) => updateAdminStatus(booking.id, event.target.value)} className="border border-neutral-300 bg-white px-3 py-2 font-semibold disabled:opacity-60">{bookingStatuses.map((status) => <option key={status}>{status}</option>)}</select></td>
+            </tr>)}</tbody>
+          </table>}
+        </div>
+      </>}
 
       {page === "dashboard" && <>
         <section className="flex flex-wrap items-end justify-between gap-5 border-b border-neutral-300 pb-6"><div><p className="text-sm font-semibold uppercase text-red-600">Your service desk</p><h1 className="mt-1 text-3xl font-black text-neutral-950">Welcome, {user.name}</h1><p className="mt-2 text-neutral-600">Here is what is happening with your car care.</p></div><div className="flex gap-3"><button onClick={() => navigate("history")} className="border border-neutral-400 px-4 py-3 text-sm font-semibold hover:border-neutral-900">Booking history</button><button onClick={() => startBooking()} className="bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700">+ Book service</button></div></section>
