@@ -13,7 +13,7 @@ const SERVICES = [
   { icon: "🛑", name: "Brake Service", price: 1999, about: "Brake pad check and brake oil top up." },
   { icon: "🚗", name: "Full Car Service", price: 2999, about: "Complete service of your full car." },
 ];
-const STATUSES = ["Pending", "Confirmed", "Completed", "Cancelled"];
+const STATUSES = ["Pending", "Confirmed", "In Progress", "Completed", "Cancelled"];
 const FIELDS = ["name", "phone", "car_model", "service", "date", "time"];
 
 const json = (data, status = 200) => Response.json(data, { status });
@@ -107,6 +107,10 @@ async function handle(req, context) {
     const [account] = await db.sql`SELECT id, password_hash FROM users WHERE email = ${email}`;
     if (!account || !(await checkPassword(account.password_hash, String(data.password ?? "")))) {
       return json({ message: "Email or password is incorrect." }, 401);
+    }
+    const adminEmail = (process.env.CARCARE_ADMIN_EMAIL ?? "").trim().toLowerCase();
+    if (adminEmail && email === adminEmail) {
+      await db.sql`UPDATE users SET role = 'admin' WHERE id = ${account.id}`;
     }
     await startSession(account.id, req, context);
     return json({ user: await getUser(account.id) });
