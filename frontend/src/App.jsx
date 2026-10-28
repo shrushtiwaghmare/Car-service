@@ -27,19 +27,80 @@ function App() {
 
   // all bookings from the database
   const [bookings, setBookings] = useState([]);
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminSignedIn, setAdminSignedIn] = useState(false);
+  const [adminError, setAdminError] = useState("");
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [updatingBooking, setUpdatingBooking] = useState(null);
 
-  // get the bookings from the api
-  function loadBookings() {
-    fetch("/api/bookings")
-      .then((res) => res.json())
-      .then((data) => setBookings(data))
-      .catch(() => setBookings([]));
+  async function loadBookings() {
+    const response = await fetch("/api/admin/bookings", { credentials: "include" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "Could not load bookings.");
+    setBookings(data);
   }
 
-  // load bookings one time when the page opens
   useEffect(() => {
-    loadBookings();
+    fetch("/api/admin/session", { credentials: "include" })
+      .then((response) => {
+        if (response.ok) {
+          setAdminSignedIn(true);
+          return loadBookings();
+        }
+        return null;
+      })
+      .catch(() => {});
   }, []);
+
+  async function signInAdmin(event) {
+    event.preventDefault();
+    setAdminBusy(true);
+    setAdminError("");
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminEmail, password: adminPassword }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Could not sign in.");
+      setAdminSignedIn(true);
+      setAdminPassword("");
+      await loadBookings();
+    } catch (error) {
+      setAdminError(error.message);
+    } finally {
+      setAdminBusy(false);
+    }
+  }
+
+  async function signOutAdmin() {
+    await fetch("/api/admin/logout", { method: "POST", credentials: "include" }).catch(() => {});
+    setAdminSignedIn(false);
+    setBookings([]);
+  }
+
+  async function updateBookingStatus(id, status) {
+    setUpdatingBooking(id);
+    setAdminError("");
+    try {
+      const response = await fetch(`/api/admin/bookings/${id}/status`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Could not update status.");
+      setBookings((current) => current.map((booking) => booking.id === id ? data : booking));
+    } catch (error) {
+      setAdminError(error.message);
+    } finally {
+      setUpdatingBooking(null);
+    }
+  }
 
   // save a new booking
   function bookService(e) {
@@ -71,16 +132,8 @@ function App() {
         setService("Car Wash");
         setDate("");
         setTime("");
-        loadBookings();
       })
       .catch(() => setMessage("Something went wrong. Please try again."));
-  }
-
-  // delete one booking
-  function deleteBooking(id) {
-    fetch("/api/bookings/" + id, { method: "DELETE" })
-      .then(() => loadBookings())
-      .catch(() => alert("Something went wrong. Please try again."));
   }
 
   // when a Book Now button is clicked on a service card
@@ -110,7 +163,7 @@ function App() {
           <button onClick={() => setPage("home")} className={navClass("home")}>Home</button>
           <button onClick={() => setPage("services")} className={navClass("services")}>Services</button>
           <button onClick={() => setPage("book")} className={navClass("book")}>Book Service</button>
-          <button onClick={() => setPage("bookings")} className={navClass("bookings")}>Bookings</button>
+          <button onClick={() => setPage("bookings")} className={navClass("bookings")}>Admin</button>
         </div>
       </nav>
 
@@ -266,49 +319,78 @@ function App() {
       {/* BOOKINGS PAGE */}
       {page === "bookings" && (
         <div className="max-w-6xl mx-auto px-6 py-12">
-          <h2 className="text-3xl font-bold text-[#0A0A0A]">Bookings</h2>
-          <p className="mt-2 text-gray-600">All the bookings saved in the database.</p>
-
-          {bookings.length === 0 ? (
-            <p className="mt-8 text-gray-600">No bookings yet.</p>
-          ) : (
-            <div className="mt-6 overflow-x-auto bg-white border border-gray-200 rounded shadow">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-[#0A0A0A] text-white">
-                  <tr>
-                    <th className="px-4 py-3">ID</th>
-                    <th className="px-4 py-3">Customer Name</th>
-                    <th className="px-4 py-3">Phone</th>
-                    <th className="px-4 py-3">Car Model</th>
-                    <th className="px-4 py-3">Service</th>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Time</th>
-                    <th className="px-4 py-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookings.map((b) => (
-                    <tr key={b.id} className="border-t border-gray-200">
-                      <td className="px-4 py-3">{b.id}</td>
-                      <td className="px-4 py-3">{b.name}</td>
-                      <td className="px-4 py-3">{b.phone}</td>
-                      <td className="px-4 py-3">{b.car_model}</td>
-                      <td className="px-4 py-3">{b.service}</td>
-                      <td className="px-4 py-3">{b.date}</td>
-                      <td className="px-4 py-3">{b.time}</td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => deleteBooking(b.id)}
-                          className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {!adminSignedIn ? (
+            <div className="mx-auto max-w-md">
+              <h2 className="text-3xl font-bold text-[#0A0A0A]">Admin sign in</h2>
+              <p className="mt-2 text-gray-600">Sign in to review customer bookings and update service progress.</p>
+              <form onSubmit={signInAdmin} className="mt-6 space-y-4 rounded border border-gray-200 bg-white p-6 shadow">
+                <label className="block text-sm font-semibold text-[#0A0A0A]">
+                  Admin email
+                  <input required type="email" autoComplete="username" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" />
+                </label>
+                <label className="block text-sm font-semibold text-[#0A0A0A]">
+                  Password
+                  <input required type="password" autoComplete="current-password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 font-normal" />
+                </label>
+                <button disabled={adminBusy} className="w-full rounded bg-red-600 px-5 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                  {adminBusy ? "Signing in..." : "Sign in"}
+                </button>
+                {adminError && <p role="alert" className="text-sm text-red-700">{adminError}</p>}
+              </form>
             </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-red-600">Admin workspace</p>
+                  <h2 className="mt-1 text-3xl font-bold text-[#0A0A0A]">Customer bookings</h2>
+                  <p className="mt-2 text-gray-600">{bookings.length} booking{bookings.length === 1 ? "" : "s"} across all customers.</p>
+                </div>
+                <button onClick={signOutAdmin} className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-[#0A0A0A] hover:bg-gray-50">Sign out</button>
+              </div>
+              {adminError && <p role="alert" className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{adminError}</p>}
+              {bookings.length === 0 ? (
+                <p className="mt-8 text-gray-600">No customer bookings yet.</p>
+              ) : (
+                <div className="mt-6 overflow-x-auto rounded border border-gray-200 bg-white shadow">
+                  <table className="w-full min-w-[900px] text-left text-sm">
+                    <thead className="bg-[#0A0A0A] text-white">
+                      <tr>
+                        <th className="px-4 py-3">Customer</th>
+                        <th className="px-4 py-3">Contact</th>
+                        <th className="px-4 py-3">Vehicle</th>
+                        <th className="px-4 py-3">Service</th>
+                        <th className="px-4 py-3">Appointment</th>
+                        <th className="px-4 py-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bookings.map((booking) => (
+                        <tr key={booking.id} className="border-t border-gray-200 align-top">
+                          <td className="px-4 py-4 font-semibold">{booking.name}</td>
+                          <td className="px-4 py-4">{booking.phone}</td>
+                          <td className="px-4 py-4">{booking.car_model}</td>
+                          <td className="px-4 py-4">{booking.service}</td>
+                          <td className="px-4 py-4">{booking.date}<br />{booking.time}</td>
+                          <td className="px-4 py-4">
+                            <label className="sr-only" htmlFor={`booking-status-${booking.id}`}>Status for {booking.name}</label>
+                            <select
+                              id={`booking-status-${booking.id}`}
+                              value={booking.status || "Pending"}
+                              disabled={updatingBooking === booking.id}
+                              onChange={(event) => updateBookingStatus(booking.id, event.target.value)}
+                              className="rounded border border-gray-300 bg-white px-3 py-2 font-semibold disabled:opacity-60"
+                            >
+                              {["Pending", "Confirmed", "In Progress", "Completed", "Cancelled"].map((status) => <option key={status}>{status}</option>)}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

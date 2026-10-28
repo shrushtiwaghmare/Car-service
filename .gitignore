@@ -6,3 +6,5 @@ carcare.db
 
 # Local Netlify folder
 .netlify
+.env
+.env.*
